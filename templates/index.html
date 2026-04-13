@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Daily News Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        dark: { 800: '#1a1a2e', 900: '#0f0f1a', 700: '#25253e' },
+                        accent: { 400: '#6c63ff', 500: '#5a52e0', 600: '#4840c4' },
+                        cyber: { green: '#00ff88', blue: '#00d4ff', orange: '#ff8c00', pink: '#ff3e8a' }
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        .tab-active { border-bottom: 2px solid #6c63ff; color: #6c63ff; }
+        .card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(108, 99, 255, 0.15); }
+        .pulse-dot { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #1a1a2e; }
+        ::-webkit-scrollbar-thumb { background: #6c63ff; border-radius: 3px; }
+        .source-badge { font-size: 0.65rem; padding: 2px 8px; border-radius: 9999px; }
+        .stars-bar { background: linear-gradient(90deg, #6c63ff, #00d4ff); border-radius: 4px; height: 6px; }
+        .trending-up { color: #00ff88; }
+        .trending-neutral { color: #888; }
+    </style>
+</head>
+<body class="bg-dark-900 text-gray-100 min-h-screen">
+
+    <!-- Header -->
+    <header class="bg-dark-800 border-b border-gray-800 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 bg-accent-400 rounded-lg flex items-center justify-center font-bold text-sm">AI</div>
+                <div>
+                    <h1 class="text-lg font-semibold">AI Daily News</h1>
+                    <p class="text-xs text-gray-500 mono">Real-time intelligence feed</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="text-xs text-gray-500">
+                    <span class="pulse-dot inline-block w-2 h-2 bg-green-400 rounded-full mr-1"></span>
+                    Updated: <span id="last-updated">{{ last_updated }}</span>
+                </div>
+                <button onclick="refreshAll()" id="refresh-btn"
+                    class="px-3 py-1.5 bg-accent-400 hover:bg-accent-500 rounded-lg text-xs font-medium transition-colors">
+                    Refresh
+                </button>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="max-w-7xl mx-auto px-4">
+            <nav class="flex gap-1 -mb-px" id="tabs">
+                <button onclick="switchTab('news')" data-tab="news"
+                    class="tab-active px-4 py-2.5 text-sm font-medium border-b-2 transition-colors hover:text-accent-400">
+                    News Feed
+                </button>
+                <button onclick="switchTab('claws')" data-tab="claws"
+                    class="px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-gray-400 transition-colors hover:text-accent-400">
+                    Agents & CLAWs
+                </button>
+                <button onclick="switchTab('tools')" data-tab="tools"
+                    class="px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-gray-400 transition-colors hover:text-accent-400">
+                    AI Tools
+                </button>
+                <button onclick="switchTab('explore')" data-tab="explore"
+                    class="px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-gray-400 transition-colors hover:text-accent-400">
+                    Explore & Links
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 py-6">
+
+        <!-- ============================================================ -->
+        <!-- NEWS FEED TAB -->
+        <!-- ============================================================ -->
+        <section id="panel-news" class="fade-in">
+            <!-- Source filters -->
+            <div class="mb-4 flex flex-wrap gap-2 items-center">
+                <span class="text-xs text-gray-500 mr-2">Filter:</span>
+                <button onclick="filterNews('all')" class="filter-btn active px-3 py-1 rounded-full text-xs bg-accent-400 text-white">All</button>
+                <button onclick="filterNews('company')" class="filter-btn px-3 py-1 rounded-full text-xs bg-dark-700 text-gray-300 hover:bg-dark-800">Companies</button>
+                <button onclick="filterNews('outlet')" class="filter-btn px-3 py-1 rounded-full text-xs bg-dark-700 text-gray-300 hover:bg-dark-800">News Outlets</button>
+                <input type="text" id="news-search" placeholder="Search articles..."
+                    oninput="searchNews(this.value)"
+                    class="ml-auto px-3 py-1.5 bg-dark-700 border border-gray-700 rounded-lg text-xs text-gray-200 w-64 focus:outline-none focus:border-accent-400">
+            </div>
+
+            <div id="news-list" class="space-y-3">
+                <div class="text-center py-12 text-gray-500">
+                    <div class="animate-spin w-8 h-8 border-2 border-accent-400 border-t-transparent rounded-full mx-auto mb-3"></div>
+                    Loading news feed...
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================================================ -->
+        <!-- AGENTS & CLAWs TAB -->
+        <!-- ============================================================ -->
+        <section id="panel-claws" class="hidden fade-in">
+            <div class="mb-4 flex items-center justify-between">
+                <div>
+                    <h2 class="text-base font-semibold">Open-Source AI Agents & CLAW Frameworks</h2>
+                    <p class="text-xs text-gray-500 mt-0.5">Sorted by GitHub stars. Data refreshes every 30 min.</p>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="sortClaws('stars')" class="sort-btn active px-3 py-1 rounded-full text-xs bg-accent-400 text-white">Stars</button>
+                    <button onclick="sortClaws('forks')" class="sort-btn px-3 py-1 rounded-full text-xs bg-dark-700 text-gray-300">Forks</button>
+                    <button onclick="sortClaws('recent')" class="sort-btn px-3 py-1 rounded-full text-xs bg-dark-700 text-gray-300">Recent Activity</button>
+                </div>
+            </div>
+
+            <!-- Summary cards -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                <div class="bg-dark-800 rounded-xl p-4 border border-gray-800">
+                    <div class="text-xs text-gray-500">Total Repos Tracked</div>
+                    <div id="claw-total" class="text-2xl font-bold text-accent-400 mt-1">--</div>
+                </div>
+                <div class="bg-dark-800 rounded-xl p-4 border border-gray-800">
+                    <div class="text-xs text-gray-500">Combined Stars</div>
+                    <div id="claw-stars-total" class="text-2xl font-bold text-cyber-green mt-1">--</div>
+                </div>
+                <div class="bg-dark-800 rounded-xl p-4 border border-gray-800">
+                    <div class="text-xs text-gray-500">Most Active (7d)</div>
+                    <div id="claw-most-active" class="text-2xl font-bold text-cyber-blue mt-1">--</div>
+                </div>
+                <div class="bg-dark-800 rounded-xl p-4 border border-gray-800">
+                    <div class="text-xs text-gray-500">Top Language</div>
+                    <div id="claw-top-lang" class="text-2xl font-bold text-cyber-orange mt-1">--</div>
+                </div>
+            </div>
+
+            <div id="claws-list" class="space-y-3">
+                <div class="text-center py-12 text-gray-500">
+                    <div class="animate-spin w-8 h-8 border-2 border-accent-400 border-t-transparent rounded-full mx-auto mb-3"></div>
+                    Loading agent data from GitHub...
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================================================ -->
+        <!-- AI TOOLS TAB -->
+        <!-- ============================================================ -->
+        <section id="panel-tools" class="hidden fade-in">
+            <div class="mb-4">
+                <h2 class="text-base font-semibold">AI Tools & Platforms</h2>
+                <p class="text-xs text-gray-500 mt-0.5">Curated list of production AI tools across categories.</p>
+            </div>
+
+            <div class="flex flex-wrap gap-2 mb-4">
+                <button onclick="filterTools('all')" class="tool-filter active px-3 py-1 rounded-full text-xs bg-accent-400 text-white">All</button>
+            </div>
+
+            <div id="tools-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div class="text-center py-12 text-gray-500 col-span-3">Loading tools...</div>
+            </div>
+        </section>
+
+        <!-- ============================================================ -->
+        <!-- EXPLORE & LINKS TAB -->
+        <!-- ============================================================ -->
+        <section id="panel-explore" class="hidden fade-in">
+            <h2 class="text-base font-semibold mb-4">Explore & Stay Current</h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Research & Papers -->
+                <div class="bg-dark-800 rounded-xl p-5 border border-gray-800">
+                    <h3 class="text-sm font-semibold text-accent-400 mb-3">Research & Papers</h3>
+                    <ul class="space-y-2 text-sm">
+                        <li><a href="https://arxiv.org/list/cs.AI/recent" target="_blank" class="text-gray-300 hover:text-accent-400 transition-colors">arXiv cs.AI - Latest Papers</a></li>
+                        <li><a href="https://arxiv.org/list/cs.CL/recent" target="_blank" class="text-gray-300 hover:text-accent-400 transition-colors">arXiv cs.CL - Computation & Language</a></li>
+                        <li><a href="https://arxiv.org/list/cs.LG/recent" target="_blank" class="text-gray-300 hover:text-accent-400 transition-colors">arXiv cs.LG - Machine Learning</a></li>
+                        <li><a href="https://paperswithcode.com" target="_blank" class="text-gray-300 hover:text-accent-400 transition-colors">Papers With Code</a></li>
+                        <li><a href="https://huggingface.co/papers" target="_blank" class="text-gray-300 hover:text-accent-400 transition-colors">Hugging Face Daily Papers</a></li>
+                        <li><a href="https://www.semanticscholar.org" target="_blank" class="text-gray-300 hover:text-accent-400 transition-colors">Semantic Scholar</a></li>
+                    </ul>
+                </div>
+
+                <!-- Benchmarks & Leaderboards -->
+                <div class="bg-dark-800 rounded-xl p-5 border border-gray-800">
+                    <h3 class="text-sm font-semibold text-cyber-green mb-3">Benchmarks & Leaderboards</h3>
+                    <ul class="space-y-2 text-sm">
+                        <li><a href="https://huggingface.co/spaces/open-llm-leaderboard/open_llm_leaderboard" target="_blank" class="text-gray-300 hover:text-cyber-green transition-colors">Open LLM Leaderboard (HF)</a></li>
+                        <li><a href="https://chat.lmsys.org/?leaderboard" target="_blank" class="text-gray-300 hover:text-cyber-green transition-colors">Chatbot Arena / LMSYS</a></li>
+                        <li><a href="https://artificialanalysis.ai" target="_blank" class="text-gray-300 hover:text-cyber-green transition-colors">Artificial Analysis - LLM Benchmarks</a></li>
+                        <li><a href="https://livebench.ai" target="_blank" class="text-gray-300 hover:text-cyber-green transition-colors">LiveBench - Contamination-free evals</a></li>
+                        <li><a href="https://scale.com/leaderboard" target="_blank" class="text-gray-300 hover:text-cyber-green transition-colors">Scale AI SEAL Leaderboard</a></li>
+                        <li><a href="https://klu.ai/llm-leaderboard" target="_blank" class="text-gray-300 hover:text-cyber-green transition-colors">Klu.ai LLM Leaderboard</a></li>
+                        <li><a href="https://www.vellum.ai/llm-leaderboard" target="_blank" class="text-gray-300 hover:text-cyber-green transition-colors">Vellum LLM Leaderboard</a></li>
+                    </ul>
+                </div>
+
+                <!-- Model Hubs -->
+                <div class="bg-dark-800 rounded-xl p-5 border border-gray-800">
+                    <h3 class="text-sm font-semibold text-cyber-blue mb-3">Model Hubs & Registries</h3>
+                    <ul class="space-y-2 text-sm">
+                        <li><a href="https://huggingface.co/models" target="_blank" class="text-gray-300 hover:text-cyber-blue transition-colors">Hugging Face Models</a></li>
+                        <li><a href="https://ollama.com/library" target="_blank" class="text-gray-300 hover:text-cyber-blue transition-colors">Ollama Model Library</a></li>
+                        <li><a href="https://openrouter.ai/models" target="_blank" class="text-gray-300 hover:text-cyber-blue transition-colors">OpenRouter - Multi-provider API</a></li>
+                        <li><a href="https://replicate.com/explore" target="_blank" class="text-gray-300 hover:text-cyber-blue transition-colors">Replicate - Run Models via API</a></li>
+                        <li><a href="https://together.ai/models" target="_blank" class="text-gray-300 hover:text-cyber-blue transition-colors">Together AI Models</a></li>
+                    </ul>
+                </div>
+
+                <!-- Newsletters & Podcasts -->
+                <div class="bg-dark-800 rounded-xl p-5 border border-gray-800">
+                    <h3 class="text-sm font-semibold text-cyber-orange mb-3">Newsletters & Podcasts</h3>
+                    <ul class="space-y-2 text-sm">
+                        <li><a href="https://www.therundown.ai" target="_blank" class="text-gray-300 hover:text-cyber-orange transition-colors">The Rundown AI (daily newsletter)</a></li>
+                        <li><a href="https://tldr.tech/ai" target="_blank" class="text-gray-300 hover:text-cyber-orange transition-colors">TLDR AI (daily newsletter)</a></li>
+                        <li><a href="https://bensbites.com" target="_blank" class="text-gray-300 hover:text-cyber-orange transition-colors">Ben's Bites</a></li>
+                        <li><a href="https://importai.substack.com" target="_blank" class="text-gray-300 hover:text-cyber-orange transition-colors">Import AI by Jack Clark</a></li>
+                        <li><a href="https://thegradient.pub" target="_blank" class="text-gray-300 hover:text-cyber-orange transition-colors">The Gradient</a></li>
+                        <li><a href="https://www.latent.space/podcast" target="_blank" class="text-gray-300 hover:text-cyber-orange transition-colors">Latent Space Podcast</a></li>
+                    </ul>
+                </div>
+
+                <!-- Communities -->
+                <div class="bg-dark-800 rounded-xl p-5 border border-gray-800">
+                    <h3 class="text-sm font-semibold text-cyber-pink mb-3">Communities & Discussion</h3>
+                    <ul class="space-y-2 text-sm">
+                        <li><a href="https://reddit.com/r/MachineLearning" target="_blank" class="text-gray-300 hover:text-cyber-pink transition-colors">r/MachineLearning</a></li>
+                        <li><a href="https://reddit.com/r/LocalLLaMA" target="_blank" class="text-gray-300 hover:text-cyber-pink transition-colors">r/LocalLLaMA</a></li>
+                        <li><a href="https://reddit.com/r/artificial" target="_blank" class="text-gray-300 hover:text-cyber-pink transition-colors">r/artificial</a></li>
+                        <li><a href="https://news.ycombinator.com" target="_blank" class="text-gray-300 hover:text-cyber-pink transition-colors">Hacker News</a></li>
+                        <li><a href="https://discord.gg/huggingface" target="_blank" class="text-gray-300 hover:text-cyber-pink transition-colors">Hugging Face Discord</a></li>
+                    </ul>
+                </div>
+
+                <!-- Company Blogs -->
+                <div class="bg-dark-800 rounded-xl p-5 border border-gray-800">
+                    <h3 class="text-sm font-semibold text-gray-300 mb-3">Company Blogs (Direct)</h3>
+                    <ul class="space-y-2 text-sm">
+                        <li><a href="https://openai.com/blog" target="_blank" class="text-gray-300 hover:text-white transition-colors">OpenAI Blog</a></li>
+                        <li><a href="https://www.anthropic.com/news" target="_blank" class="text-gray-300 hover:text-white transition-colors">Anthropic News</a></li>
+                        <li><a href="https://blog.google/technology/ai/" target="_blank" class="text-gray-300 hover:text-white transition-colors">Google AI Blog</a></li>
+                        <li><a href="https://blogs.nvidia.com/blog/category/deep-learning/" target="_blank" class="text-gray-300 hover:text-white transition-colors">NVIDIA AI Blog</a></li>
+                        <li><a href="https://ai.meta.com/blog/" target="_blank" class="text-gray-300 hover:text-white transition-colors">Meta AI Blog</a></li>
+                        <li><a href="https://www.amazon.science" target="_blank" class="text-gray-300 hover:text-white transition-colors">Amazon Science</a></li>
+                        <li><a href="https://blogs.microsoft.com/ai/" target="_blank" class="text-gray-300 hover:text-white transition-colors">Microsoft AI Blog</a></li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="border-t border-gray-800 mt-12 py-4 text-center text-xs text-gray-600">
+        AI Daily News Dashboard &mdash; Data from RSS feeds & GitHub API &mdash; Auto-refreshes every 30 min
+    </footer>
+
+    <script>
+        // ====================================================================
+        // State
+        // ====================================================================
+        let newsData = [];
+        let clawsData = [];
+        let toolsData = [];
+        let currentNewsFilter = 'all';
+        let currentSearchQuery = '';
+
+        const COMPANY_SOURCES = ['OpenAI', 'Anthropic', 'Google AI', 'NVIDIA AI', 'Amazon Science', 'Meta AI', 'Microsoft AI', 'Hugging Face'];
+
+        // ====================================================================
+        // Tab switching
+        // ====================================================================
+        function switchTab(tab) {
+            document.querySelectorAll('[id^="panel-"]').forEach(p => p.classList.add('hidden'));
+            document.getElementById(`panel-${tab}`).classList.remove('hidden');
+            document.getElementById(`panel-${tab}`).classList.add('fade-in');
+
+            document.querySelectorAll('#tabs button').forEach(b => {
+                b.classList.remove('tab-active');
+                b.classList.add('border-transparent', 'text-gray-400');
+            });
+            const activeBtn = document.querySelector(`#tabs [data-tab="${tab}"]`);
+            activeBtn.classList.add('tab-active');
+            activeBtn.classList.remove('border-transparent', 'text-gray-400');
+        }
+
+        // ====================================================================
+        // Source color mapping
+        // ====================================================================
+        const SOURCE_COLORS = {
+            'OpenAI': 'bg-green-900/50 text-green-300',
+            'Anthropic': 'bg-orange-900/50 text-orange-300',
+            'Google AI': 'bg-blue-900/50 text-blue-300',
+            'NVIDIA AI': 'bg-lime-900/50 text-lime-300',
+            'Amazon Science': 'bg-yellow-900/50 text-yellow-300',
+            'Meta AI': 'bg-indigo-900/50 text-indigo-300',
+            'Microsoft AI': 'bg-cyan-900/50 text-cyan-300',
+            'Hugging Face': 'bg-amber-900/50 text-amber-300',
+            'The Verge AI': 'bg-purple-900/50 text-purple-300',
+            'TechCrunch AI': 'bg-emerald-900/50 text-emerald-300',
+            'VentureBeat AI': 'bg-rose-900/50 text-rose-300',
+            'Ars Technica AI': 'bg-red-900/50 text-red-300',
+            'MIT Tech Review': 'bg-teal-900/50 text-teal-300',
+        };
+
+        // ====================================================================
+        // News rendering
+        // ====================================================================
+        function renderNews(articles) {
+            const container = document.getElementById('news-list');
+            if (!articles.length) {
+                container.innerHTML = '<div class="text-center py-12 text-gray-500">No articles found. Try refreshing.</div>';
+                return;
+            }
+
+            let filtered = articles;
+            if (currentNewsFilter === 'company') {
+                filtered = articles.filter(a => COMPANY_SOURCES.includes(a.source));
+            } else if (currentNewsFilter === 'outlet') {
+                filtered = articles.filter(a => !COMPANY_SOURCES.includes(a.source));
+            }
+
+            if (currentSearchQuery) {
+                const q = currentSearchQuery.toLowerCase();
+                filtered = filtered.filter(a =>
+                    a.title.toLowerCase().includes(q) ||
+                    a.summary.toLowerCase().includes(q) ||
+                    a.source.toLowerCase().includes(q)
+                );
+            }
+
+            container.innerHTML = filtered.map(a => {
+                const colorClass = SOURCE_COLORS[a.source] || 'bg-gray-800 text-gray-300';
+                return `
+                <a href="${a.link}" target="_blank" class="block bg-dark-800 rounded-xl p-4 border border-gray-800 card-hover transition-all duration-200">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 mb-1.5">
+                                <span class="source-badge ${colorClass} font-medium">${a.source}</span>
+                                <span class="text-xs text-gray-500 mono">${a.published}</span>
+                            </div>
+                            <h3 class="text-sm font-medium text-gray-100 leading-snug">${a.title}</h3>
+                            ${a.summary ? `<p class="text-xs text-gray-500 mt-1.5 line-clamp-2">${a.summary}</p>` : ''}
+                        </div>
+                        <svg class="w-4 h-4 text-gray-600 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                        </svg>
+                    </div>
+                </a>`;
+            }).join('');
+        }
+
+        function filterNews(type) {
+            currentNewsFilter = type;
+            document.querySelectorAll('.filter-btn').forEach(b => {
+                b.classList.remove('active', 'bg-accent-400', 'text-white');
+                b.classList.add('bg-dark-700', 'text-gray-300');
+            });
+            event.target.classList.add('active', 'bg-accent-400', 'text-white');
+            event.target.classList.remove('bg-dark-700', 'text-gray-300');
+            renderNews(newsData);
+        }
+
+        function searchNews(query) {
+            currentSearchQuery = query;
+            renderNews(newsData);
+        }
+
+        // ====================================================================
+        // CLAWs rendering
+        // ====================================================================
+        function renderClaws(data) {
+            const container = document.getElementById('claws-list');
+            if (!data.length) {
+                container.innerHTML = '<div class="text-center py-12 text-gray-500">Loading agent data...</div>';
+                return;
+            }
+
+            // Update summary cards
+            const maxStars = Math.max(...data.map(d => d.stars));
+            document.getElementById('claw-total').textContent = data.length;
+            document.getElementById('claw-stars-total').textContent = formatNumber(data.reduce((s, d) => s + d.stars, 0));
+
+            const mostActive = data.reduce((a, b) => {
+                const aVal = typeof a.recent_commits === 'number' ? a.recent_commits : 99;
+                const bVal = typeof b.recent_commits === 'number' ? b.recent_commits : 99;
+                return aVal > bVal ? a : b;
+            });
+            document.getElementById('claw-most-active').textContent = mostActive.name;
+
+            const langCount = {};
+            data.forEach(d => { if (d.language !== 'N/A') langCount[d.language] = (langCount[d.language] || 0) + 1; });
+            const topLang = Object.entries(langCount).sort((a, b) => b[1] - a[1])[0];
+            document.getElementById('claw-top-lang').textContent = topLang ? topLang[0] : 'N/A';
+
+            container.innerHTML = data.map((d, i) => {
+                const barWidth = maxStars > 0 ? Math.max(5, (d.stars / maxStars) * 100) : 5;
+                const topics = d.topics.map(t => `<span class="text-[10px] bg-dark-700 text-gray-400 px-1.5 py-0.5 rounded">${t}</span>`).join('');
+                return `
+                <div class="bg-dark-800 rounded-xl p-4 border border-gray-800 card-hover transition-all duration-200">
+                    <div class="flex items-start justify-between gap-4">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="text-xs text-gray-600 mono font-medium">#${i + 1}</span>
+                                <a href="${d.url}" target="_blank" class="text-sm font-semibold text-accent-400 hover:underline">${d.name}</a>
+                                <span class="text-[10px] text-gray-600 mono">${d.repo}</span>
+                            </div>
+                            <p class="text-xs text-gray-400 mb-2">${d.desc}</p>
+                            <div class="flex flex-wrap gap-1 mb-2">${topics}</div>
+                            <div class="stars-bar" style="width: ${barWidth}%"></div>
+                        </div>
+                        <div class="text-right flex-shrink-0 space-y-1">
+                            <div class="text-sm font-bold text-gray-100">${formatNumber(d.stars)}<span class="text-[10px] text-gray-500 ml-1">stars</span></div>
+                            <div class="text-xs text-gray-400">${formatNumber(d.forks)} forks</div>
+                            <div class="text-xs text-gray-500">${d.language}</div>
+                            <div class="text-[10px] text-gray-500">pushed ${d.last_push}</div>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function sortClaws(by) {
+            document.querySelectorAll('.sort-btn').forEach(b => {
+                b.classList.remove('active', 'bg-accent-400', 'text-white');
+                b.classList.add('bg-dark-700', 'text-gray-300');
+            });
+            event.target.classList.add('active', 'bg-accent-400', 'text-white');
+            event.target.classList.remove('bg-dark-700', 'text-gray-300');
+
+            const sorted = [...clawsData];
+            if (by === 'stars') sorted.sort((a, b) => b.stars - a.stars);
+            else if (by === 'forks') sorted.sort((a, b) => b.forks - a.forks);
+            else if (by === 'recent') sorted.sort((a, b) => {
+                const parse = v => v === 'today' ? 0 : v === 'N/A' ? 999 : parseInt(v);
+                return parse(a.last_push) - parse(b.last_push);
+            });
+            renderClaws(sorted);
+        }
+
+        // ====================================================================
+        // Tools rendering
+        // ====================================================================
+        function renderTools(data) {
+            const container = document.getElementById('tools-grid');
+            const filterContainer = document.querySelector('.tool-filter').parentElement;
+
+            // Build category filters
+            const categories = [...new Set(data.map(t => t.category))].sort();
+            filterContainer.innerHTML = `
+                <button onclick="filterTools('all')" class="tool-filter active px-3 py-1 rounded-full text-xs bg-accent-400 text-white">All</button>
+                ${categories.map(c => `<button onclick="filterTools('${c}')" class="tool-filter px-3 py-1 rounded-full text-xs bg-dark-700 text-gray-300 hover:bg-dark-800">${c}</button>`).join('')}
+            `;
+
+            renderToolsFiltered(data, 'all');
+        }
+
+        function filterTools(category) {
+            document.querySelectorAll('.tool-filter').forEach(b => {
+                b.classList.remove('active', 'bg-accent-400', 'text-white');
+                b.classList.add('bg-dark-700', 'text-gray-300');
+            });
+            event.target.classList.add('active', 'bg-accent-400', 'text-white');
+            event.target.classList.remove('bg-dark-700', 'text-gray-300');
+
+            const filtered = category === 'all' ? toolsData : toolsData.filter(t => t.category === category);
+            renderToolsFiltered(filtered, category);
+        }
+
+        function renderToolsFiltered(data, category) {
+            const container = document.getElementById('tools-grid');
+            container.innerHTML = data.map(t => `
+                <a href="${t.url}" target="_blank" class="bg-dark-800 rounded-xl p-4 border border-gray-800 card-hover transition-all duration-200 block">
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <h3 class="text-sm font-semibold text-gray-100">${t.name}</h3>
+                            <span class="text-[10px] text-accent-400">${t.category}</span>
+                        </div>
+                        <svg class="w-3.5 h-3.5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                        </svg>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2">${t.desc}</p>
+                </a>
+            `).join('');
+        }
+
+        // ====================================================================
+        // Utility
+        // ====================================================================
+        function formatNumber(n) {
+            if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
+            return n.toString();
+        }
+
+        // ====================================================================
+        // Data loading
+        // ====================================================================
+        async function loadAll() {
+            const [newsResp, clawsResp, toolsResp] = await Promise.all([
+                fetch('/api/news').then(r => r.json()).catch(() => []),
+                fetch('/api/claws').then(r => r.json()).catch(() => []),
+                fetch('/api/tools').then(r => r.json()).catch(() => []),
+            ]);
+
+            newsData = newsResp;
+            clawsData = clawsResp;
+            toolsData = toolsResp;
+
+            renderNews(newsData);
+            renderClaws(clawsData);
+            renderTools(toolsData);
+        }
+
+        async function refreshAll() {
+            const btn = document.getElementById('refresh-btn');
+            btn.textContent = 'Refreshing...';
+            btn.disabled = true;
+
+            await fetch('/api/refresh', { method: 'POST' });
+
+            // Wait a bit for data to start loading, then poll
+            setTimeout(async () => {
+                await loadAll();
+                btn.textContent = 'Refresh';
+                btn.disabled = false;
+                document.getElementById('last-updated').textContent = new Date().toISOString().slice(0, 16) + ' UTC';
+            }, 15000);
+        }
+
+        // Auto-refresh every 30 minutes
+        setInterval(loadAll, 30 * 60 * 1000);
+
+        // Initial load - retry a few times as backend may still be fetching
+        loadAll();
+        setTimeout(loadAll, 10000);
+        setTimeout(loadAll, 30000);
+    </script>
+</body>
+</html>
